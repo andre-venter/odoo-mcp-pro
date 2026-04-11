@@ -310,23 +310,23 @@ When we have enough users, consider a public status page at `status.pantalytics.
 
 ## 7. Stability Roadmap
 
-### Week 1 (now)
-- [ ] Increase Zitadel token lifetime to 48h
-- [ ] Set up external uptime monitoring (BetterUptime free tier)
-- [ ] Create PostHog "MCP System Health" dashboard
-- [ ] Set up PostHog alerts for auth failures
+### Week 1 - DONE (2026-04-11)
+- [x] Increase Zitadel access token lifetime from 12h to 48h
+- [x] Enable refresh tokens (90 days lifetime, 30 days idle)
+- [x] Create PostHog "MCP System Health" dashboard (3 panels: tool calls, auth flow, tool breakdown)
+- [x] Set up PostHog alerts: "Auth Failures" (hourly) + "Usage Drop" (daily, skip weekends)
+- [x] Add PostHog auth flow tracking: auth_login_success, auth_callback_error, auth_state_invalid, auth_token_exchange_failed, auth_userinfo_failed
 
-### Week 2
-- [ ] Move PKCE state to Postgres
-- [ ] Add deploy events to PostHog
-- [ ] Keep old container running 30s after deploy
-- [ ] Set up custom SMTP in Zitadel via Brevo
+### Week 2 - DONE (2026-04-11)
+- [x] Move PKCE state from in-memory to Postgres (pending_auth table, 10-min auto-expiry)
+- [x] Keep old container running 30s after deploy (drain in-flight requests)
+- [ ] Set up custom SMTP in Zitadel via Brevo (deferred - low priority while Zitadel Cloud SMTP works)
 
 ### Week 3
-- [ ] Cache token introspection (60s)
-- [ ] Add retry logic to introspection
+- [ ] Cache token introspection results (60s TTL)
+- [ ] Add retry logic to introspection with exponential backoff
 - [ ] Error pages instead of silent redirect loops
-- [ ] Handle OPTIONS on callback
+- [ ] Handle OPTIONS on /admin/callback (CORS preflight)
 
 ### Ongoing
 - [ ] Review PostHog dashboard weekly
