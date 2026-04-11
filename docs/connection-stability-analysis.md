@@ -3,7 +3,7 @@
 ## Date: 2026-04-11
 
 ## Problem Statement
-Users (Daniel, Andrew, and others) report recurring issues:
+Users reported recurring issues:
 1. "Could not verify email" during Zitadel registration
 2. Login callback loops (callback succeeds but session is lost)
 3. Claude MCP connector disconnects requiring manual reconnect
@@ -13,13 +13,11 @@ Users (Daniel, Andrew, and others) report recurring issues:
 
 ## 1. Login / Session Issues
 
-### What the logs show (last 7 days)
-- **65 OAuth callbacks** received
-- **63 successful callbacks** (302 redirect)
-- **62 successful logins** ("logged in" in logs)
-- **1 invalid state** error
-- **2 CORS preflight (OPTIONS)** on callback returning 405
-- Multiple **login loops**: callback 302 -> login -> login/start -> callback (repeating)
+### What the logs showed (initial investigation, April 2026)
+- ~95% login success rate
+- Occasional invalid state errors (PKCE lost during deploy)
+- CORS preflight (OPTIONS) on callback returning 405
+- Login loops: callback -> login -> login/start (repeating)
 
 ### Root cause: Login callback loop
 The pattern `callback 302 -> login 302 -> login/start 302` means:
@@ -104,12 +102,11 @@ The pattern `callback 302 -> login 302 -> login/start 302` means:
 - Zitadel Console > Projects > App > Token Settings - verify token lifetimes
 - Some corporate email filters block `notification@zitadel.cloud` - custom SMTP fixes this
 
-### Our specific situation:
-- We use Zitadel Cloud EU instance (`odoo-mcp-pro-xywtof.eu1.zitadel.cloud`)
-- SMTP is managed by Zitadel - `notification@zitadel.cloud` may land in spam
-- Users with corporate email (e.g. company domains) more likely to hit spam filters
-- **Action**: Consider setting up custom SMTP in Zitadel (e.g. via Brevo) for reliable delivery
-- **Action**: Advise users to check spam folder for verification email
+### Our situation:
+- We use Zitadel Cloud EU instance
+- Default SMTP sender `notification@zitadel.cloud` may land in spam for corporate domains
+- **Fixed**: Custom SMTP configured via Brevo for reliable delivery
+- **Mitigation**: Advise users to check spam folder for verification email
 
 ---
 

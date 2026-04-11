@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-04-11
+
+### Added
+- **PostHog auth flow tracking**: server-side events for login success, callback errors, state loss, token exchange failures (privacy-respecting, no PII)
+- **PostHog "MCP System Health" dashboard** with alerts for auth failures and usage drops
+- **Auth error pages**: clear error messages instead of silent redirect loops on login failures
+- **Token introspection caching**: 60-second cache with retry logic reduces Zitadel round-trips
+- **CORS handler** on `/admin/callback` (fixes OPTIONS preflight returning 405)
+- **Connection profiles**: save multiple Odoo connections and switch instantly without disconnecting Claude
+
+### Changed
+- **PKCE state persisted in Postgres**: login state survives blue-green deploys (was in-memory)
+- **Deploy drain period**: old container runs 30 seconds after new is healthy (drains in-flight requests)
+- **Access token lifetime**: increased to 48 hours (was 12h) since Claude clients don't reliably auto-refresh
+- **Refresh tokens enabled**: 90-day lifetime for seamless re-authentication
+- **Zitadel email delivery**: custom SMTP via Brevo (fixes "could not verify email" for corporate domains)
+- **Setup page redesign**: Vercel-inspired UI with active connection card, inline edit, compact profile list
+- **Hardcoded Zitadel fallbacks removed**: ZITADEL_HOST and ZITADEL_ORG_ID are now required env vars
+
+### Fixed
+- **Registration broken via claude.ai**: Caddy OAuth proxy pointed to old locked US Zitadel instance
+- **Login loops during deploy**: PKCE state lost when container restarted mid-OAuth-flow
+- **503 during deploy**: old container removed too early, Caddy had no healthy upstream
+- **Caddy DNS errors**: stopped containers kept DNS name, causing intermittent health check failures
+
 ## [1.2.0] - 2026-04-05
 
 ### Added
