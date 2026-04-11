@@ -239,6 +239,16 @@ def register_auth_routes(app, db_manager, zitadel_issuer_url: str):
         auth_url = f"{issuer}/oauth/v2/authorize?{urlencode(params)}"
         return RedirectResponse(url=auth_url, status_code=302)
 
+    @app.options("/callback")
+    async def admin_callback_options(request: Request):
+        """Handle CORS preflight for OAuth callback."""
+        from starlette.responses import Response
+        return Response(status_code=200, headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        })
+
     @app.get("/callback")
     async def admin_callback(request: Request):
         """Handle OAuth callback from Zitadel."""
@@ -269,7 +279,12 @@ def register_auth_routes(app, db_manager, zitadel_issuer_url: str):
         if not pending:
             logger.warning("Invalid or expired OAuth state")
             track_event("auth_state_invalid")
-            return RedirectResponse(url="/admin/login", status_code=302)
+            templates = request.app.state.templates
+            return templates.TemplateResponse(
+                "auth_error.html",
+                {"request": request, "error": "Login session expired. This can happen during a server update. Please try again.", "retry_url": "/admin/login"},
+                status_code=400,
+            )
 
         # Exchange code for tokens
         token_url = f"{issuer}/oauth/v2/token"
@@ -320,13 +335,23 @@ def register_auth_routes(app, db_manager, zitadel_issuer_url: str):
             if userinfo_response.status_code != 200:
                 logger.error(f"Userinfo failed: {userinfo_response.status_code}")
                 track_event("auth_userinfo_failed", properties={"status": userinfo_response.status_code})
-                return RedirectResponse(url="/admin/login", status_code=302)
+                templates = request.app.state.templates
+                return templates.TemplateResponse(
+                    "auth_error.html",
+                    {"request": request, "error": "Could not retrieve your account information. Please try again.", "retry_url": "/admin/login"},
+                    status_code=502,
+                )
 
             userinfo = userinfo_response.json()
         except Exception as e:
             logger.error(f"Userinfo error: {e}")
             track_event("auth_userinfo_failed", properties={"error": str(e)[:200]})
-            return RedirectResponse(url="/admin/login", status_code=302)
+            templates = request.app.state.templates
+            return templates.TemplateResponse(
+                "auth_error.html",
+                {"request": request, "error": "Login failed due to a temporary error. Please try again.", "retry_url": "/admin/login"},
+                status_code=502,
+            )
 
         zitadel_sub = userinfo.get("sub", "")
         email = userinfo.get("email", "")
