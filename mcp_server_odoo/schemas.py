@@ -178,6 +178,27 @@ class BulkDeleteResult(BaseModel):
     message: str = Field(description="Human-readable success message")
 
 
+# --- Import (load) ---
+
+
+class ImportResult(BaseModel):
+    """Result of importing records via Odoo's load() method with external ID support."""
+
+    success: bool = Field(description="Whether all records were imported successfully")
+    created: int = Field(description="Number of records created")
+    updated: int = Field(description="Number of records updated")
+    errors: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="List of errors with row index and message",
+    )
+    ids: List[int] = Field(
+        default_factory=list,
+        description="IDs of created/updated records",
+    )
+    model: str = Field(description="Odoo model name")
+    message: str = Field(description="Human-readable summary message")
+
+
 # --- Server Info ---
 
 
