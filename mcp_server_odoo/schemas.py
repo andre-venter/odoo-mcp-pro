@@ -185,8 +185,7 @@ class ImportResult(BaseModel):
     """Result of importing records via Odoo's load() method with external ID support."""
 
     success: bool = Field(description="Whether all records were imported successfully")
-    created: int = Field(description="Number of records created")
-    updated: int = Field(description="Number of records updated")
+    imported: int = Field(description="Number of records imported (created or updated)")
     errors: List[Dict[str, Any]] = Field(
         default_factory=list,
         description="List of errors with row index and message",

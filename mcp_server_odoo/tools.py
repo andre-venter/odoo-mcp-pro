@@ -1497,6 +1497,7 @@ class OdooToolHandler:
             connection, access_controller, sub = await self._get_user_context()
             with perf_logger.track_operation("tool_import_records", model=model):
                 access_controller.validate_model_access(model, "create")
+                access_controller.validate_model_access(model, "write")
                 if not connection.is_authenticated:
                     raise ValidationError("Not authenticated with Odoo")
                 if not fields:
@@ -1515,10 +1516,19 @@ class OdooToolHandler:
                             f"Row {i} has {len(row)} values but {len(fields)} fields were specified"
                         )
 
+                # Validate context keys (prevent dangerous keys like 'su')
+                safe_context = None
+                if context:
+                    allowed_keys = {"tracking_disable", "defer_fields_computation", "lang", "tz", "no_reset_password"}
+                    unsafe_keys = set(context.keys()) - allowed_keys
+                    if unsafe_keys:
+                        raise ValidationError(f"Context contains disallowed keys: {unsafe_keys}")
+                    safe_context = context
+
                 # Ensure all values are strings (Odoo load() expects strings)
                 str_data = [[str(v) if v is not None else "" for v in row] for row in data]
 
-                result = connection.load_records(model, fields, str_data, context)
+                result = connection.load_records(model, fields, str_data, safe_context)
 
                 # Parse Odoo load() result
                 ids = result.get("ids", []) or []
@@ -1551,8 +1561,7 @@ class OdooToolHandler:
 
                 return {
                     "success": success,
-                    "created": len(valid_ids),
-                    "updated": 0,  # load() doesn't distinguish; total count in 'created'
+                    "imported": len(valid_ids),
                     "errors": errors,
                     "ids": valid_ids,
                     "model": model,
