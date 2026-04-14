@@ -10,7 +10,6 @@ import os
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 if TYPE_CHECKING:
-    from .admin.db import DatabaseManager
     from .registry import ConnectionRegistry
 
 from mcp.server import FastMCP
@@ -432,8 +431,15 @@ class OdooMCPServer:
 
             with perf_logger.track_operation("server_startup"):
                 if database_url:
-                    # Multi-tenant mode: use ConnectionRegistry
-                    from .admin.db import DatabaseManager
+                    # Multi-tenant mode: requires odoo-mcp-pro-admin package
+                    try:
+                        from .admin.db import DatabaseManager
+                    except ImportError:
+                        raise ConfigurationError(
+                            "DATABASE_URL is set but the admin package is not installed. "
+                            "Install odoo-mcp-pro-admin for multi-tenant mode, or unset "
+                            "DATABASE_URL for single-tenant mode."
+                        )
                     from .registry import ConnectionRegistry
 
                     logger.info("Starting in multi-tenant mode (DATABASE_URL configured)")
@@ -472,21 +478,20 @@ class OdooMCPServer:
             asgi_app = self.app.streamable_http_app()
 
             if database_url:
-                # Multi-tenant: mount admin panel alongside MCP
-                from starlette.routing import Mount
+                # Multi-tenant: mount admin panel alongside MCP (requires admin package)
+                try:
+                    from starlette.routing import Mount
+                    from .admin.app import create_admin_app
 
-                from .admin.app import create_admin_app
-
-                issuer_url = os.getenv("OAUTH_ISSUER_URL", "").strip()
-                admin_app = create_admin_app(
-                    db_manager=self.db_manager,
-                    registry=self.registry,
-                    zitadel_issuer_url=issuer_url,
-                )
-                # Insert admin routes at the beginning of the MCP ASGI app's routes.
-                # We can't wrap in a new Starlette because that breaks the MCP SDK's
-                # lifespan (StreamableHTTPSessionManager needs its task group).
-                asgi_app.routes.insert(0, Mount("/admin", app=admin_app, name="admin"))
+                    issuer_url = os.getenv("OAUTH_ISSUER_URL", "").strip()
+                    admin_app = create_admin_app(
+                        db_manager=self.db_manager,
+                        registry=self.registry,
+                        zitadel_issuer_url=issuer_url,
+                    )
+                    asgi_app.routes.insert(0, Mount("/admin", app=admin_app, name="admin"))
+                except ImportError:
+                    logger.warning("Admin panel not available (odoo-mcp-pro-admin not installed)")
                 logger.info("Admin panel mounted at /admin")
 
             import uvicorn
