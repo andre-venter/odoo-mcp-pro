@@ -17,10 +17,9 @@
   <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-compatible-green.svg" alt="MCP Compatible"/></a>
   <a href="https://www.odoo.com/documentation/19.0/developer/reference/external_api.html"><img src="https://img.shields.io/badge/Odoo-14--19+-714b67.svg" alt="Odoo 14-19+"/></a>
   <a href="https://oauth.net/2.1/"><img src="https://img.shields.io/badge/OAuth-2.1-orange.svg" alt="OAuth 2.1"/></a>
-  <img src="https://img.shields.io/badge/Status-Free%20Beta-brightgreen.svg" alt="Free Beta"/>
 </p>
 
-> **Free Beta** -- odoo-mcp-pro is currently free during the beta period. [Sign up at pantalytics.com](https://pantalytics.com/en/apps/odoo-mcp-server)
+> **Skip the setup.** The hosted version is up and running in 5 minutes -- with automatic updates, managed OAuth, and encrypted API keys. **[Start at pantalytics.com →](https://pantalytics.com/en/apps/odoo-mcp-server)**
 
 <p align="center">
   <img src="docs/ai-grid@2x.png" alt="Odoo connected to Claude, OpenAI, Gemini, Copilot, Mistral via MCP" width="500"/>
@@ -52,11 +51,17 @@ odoo-mcp-pro is an AI connector for Odoo that uses MCP (Model Context Protocol) 
 
 Works with any Odoo model -- sales, invoices, contacts, inventory, CRM, HR, you name it.
 
+> **Want to try it now?** Skip the setup -- the hosted version is connected to your Odoo in under 5 minutes. **[Start at pantalytics.com →](https://pantalytics.com/en/apps/odoo-mcp-server)**
+
 ## Get started
 
 ### Hosted (recommended)
 
-We run the server for you. No installation, no Docker, no infrastructure.
+**The fastest and safest way to get started.** We run the server for you -- sign up, paste your Odoo URL + API key, done.
+
+- **Up and running in 5 minutes.** No install, no Docker, no infrastructure. Works with Claude, ChatGPT, Cursor, Windsurf, and any MCP-compatible AI tool.
+- **Always up to date.** Security patches, Odoo-version compatibility, and new MCP features ship automatically -- no upgrade work on your side.
+- **Safer by default.** Encrypted API keys (AES-128), managed OAuth 2.1, continuous monitoring, European infrastructure. We handle the boring-but-critical stuff so you don't have to.
 
 1. **[Sign up at pantalytics.com](https://pantalytics.com/en/apps/odoo-mcp-server)**
 2. Log in and enter your Odoo URL + API key ([how to generate one](SETUP.md#generating-an-odoo-api-key))
@@ -64,6 +69,8 @@ We run the server for you. No installation, no Docker, no infrastructure.
 4. Start asking questions
 
 Your data stays in Odoo -- the server is a stateless proxy. API keys are encrypted at rest.
+
+**[Start at pantalytics.com →](https://pantalytics.com/en/apps/odoo-mcp-server)**
 
 ### Self-hosted
 
@@ -99,7 +106,7 @@ Or add to your Claude Desktop `claude_desktop_config.json`:
 }
 ```
 
-**Need multi-tenant, per-user connections, OAuth, or an admin UI?** That's SaaS territory -- use the [hosted version](https://pantalytics.com/en/apps/odoo-mcp-server) instead. These features live in a separate commercial package that overlays on top of this open-core server.
+**Need multi-tenant, per-user connections, OAuth, or an admin UI?** That's SaaS territory. The [hosted version](https://pantalytics.com/en/apps/odoo-mcp-server) is faster to set up, auto-updates, and handles security patches for you -- and costs less than the time you'd spend self-hosting. These features live in a separate commercial package that overlays on top of this open-core server.
 
 ## How it works
 
@@ -125,6 +132,8 @@ odoo-mcp-pro is an Odoo connector that implements [MCP (Model Context Protocol)]
 - **Stateless proxy.** The MCP server doesn't store or cache your business data.
 - **API keys encrypted at rest** using AES-128 (Fernet). Never exposed to the AI, the browser, or logs.
 - **You stay in control.** Revoke your API key in Odoo at any time to instantly cut off access.
+
+**Prefer managed security?** The [hosted version](https://pantalytics.com/en/apps/odoo-mcp-server) handles patches, OAuth token rotation, and incident monitoring -- your data still stays in Odoo, we just run the proxy for you.
 
 ## Development
 
@@ -164,6 +173,9 @@ This means the OAuth connection between your AI tool and the MCP server failed. 
 
 **Do I need to set ODOO_DB?**
 Only if you self-host Odoo with multiple databases. Odoo.sh and Odoo Online don't need it -- the hostname determines the database.
+
+**Should I use hosted or self-hosted?**
+Hosted, unless you have a strong reason not to. Hosted is running in 5 minutes, auto-updates with every Odoo release, and has managed OAuth + encrypted API keys. Self-hosting is single-tenant only (one Odoo instance, API key auth, no admin UI), and you're on the hook for patches and security. **[Start with hosted at pantalytics.com →](https://pantalytics.com/en/apps/odoo-mcp-server)**
 
 ## License
 
