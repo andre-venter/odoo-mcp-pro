@@ -29,6 +29,7 @@ from .odoo_connection import OdooConnection
 from .odoo_json2_connection import OdooJSON2Connection
 from .performance import PerformanceManager
 from .resources import register_resources
+from .skills import register_skills
 from .tools import register_tools
 from .version_detect import detect_api_version
 
@@ -97,6 +98,9 @@ class OdooMCPServer:
                 resource_server_url=resource_url,
                 zitadel_issuer_url=oauth_issuer_url,
             )
+
+        # Skill resources — markdown workflow guides, no DB connection needed
+        register_skills(self.app)
 
         logger.info(f"Initialized Odoo MCP Server v{SERVER_VERSION}")
 
