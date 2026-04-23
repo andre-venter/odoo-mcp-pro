@@ -10,8 +10,9 @@ can list and fetch them on demand without a live Odoo connection.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Pattern, Tuple
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import Annotations, ToolAnnotations
@@ -61,13 +62,25 @@ def _parse_frontmatter(text: str) -> Tuple[Dict[str, str], str]:
     return meta, body
 
 
-def discover_skills() -> List[Dict[str, str]]:
-    """Return [{name, description, path}] for every SKILL.md found."""
+def _parse_triggers(raw: str) -> List[str]:
+    """Parse a `triggers: [a, b, c]` frontmatter value into a list.
+
+    Accepts the inline YAML-list form only (what our skills use). Empty
+    or malformed values return []. Tokens are lowercased.
+    """
+    s = raw.strip()
+    if s.startswith("[") and s.endswith("]"):
+        s = s[1:-1]
+    return [t.strip().strip("'\"").lower() for t in s.split(",") if t.strip()]
+
+
+def discover_skills() -> List[Dict[str, object]]:
+    """Return [{name, description, path, triggers}] for every SKILL.md found."""
     skills_dir = _find_skills_dir()
     if not skills_dir:
         logger.warning("No skills/ directory found; skill resources disabled")
         return []
-    out: List[Dict[str, str]] = []
+    out: List[Dict[str, object]] = []
     for child in sorted(skills_dir.iterdir()):
         skill_md = child / "SKILL.md"
         if not skill_md.is_file():
@@ -80,7 +93,13 @@ def discover_skills() -> List[Dict[str, str]]:
         meta, _ = _parse_frontmatter(text)
         name = meta.get("name") or child.name
         description = meta.get("description") or f"Odoo workflow skill: {name}"
-        out.append({"name": name, "description": description, "path": str(skill_md)})
+        triggers = _parse_triggers(meta.get("triggers", ""))
+        out.append({
+            "name": name,
+            "description": description,
+            "path": str(skill_md),
+            "triggers": triggers,
+        })
     return out
 
 
@@ -124,11 +143,32 @@ def register_skills(app: FastMCP) -> int:
     if not skills:
         return 0
 
-    # Build a {name: SKILL.md path} map for the tool handlers
-    skill_by_name: Dict[str, Path] = {s["name"]: Path(s["path"]) for s in skills}
+    # Build lookup maps for the tool handlers
+    skill_by_name: Dict[str, Path] = {str(s["name"]): Path(str(s["path"])) for s in skills}
     skill_index: List[Dict[str, str]] = [
-        {"name": s["name"], "description": s["description"]} for s in skills
+        {"name": str(s["name"]), "description": str(s["description"])} for s in skills
     ]
+    # For find_skill matching: pre-compile one regex per skill matching
+    # any of its triggers at a word-start boundary (so "offerte" matches
+    # "offertes", but trigger "po" does NOT match inside "importeer").
+    # Fall back to the skill name if no triggers are in the frontmatter.
+    trigger_map: List[Tuple[str, Pattern[str]]] = []
+    for s in skills:
+        name = str(s["name"])
+        triggers = list(s.get("triggers") or [])
+        if not triggers:
+            # Fallback: split name on dashes, keep only pieces >= 4 chars
+            # so noise like "pro" in "import-pro" doesn't match "product".
+            triggers = [t for t in name.lower().split("-") if len(t) >= 4]
+        if not triggers:
+            continue
+        # \b at start only — lets "offerte" match "offertes" but blocks
+        # mid-word hits like "po" inside "importeer".
+        pattern = re.compile(
+            r"\b(?:" + "|".join(re.escape(t) for t in triggers) + r")",
+            re.IGNORECASE,
+        )
+        trigger_map.append((name, pattern))
 
     companion_count = 0
     for skill in skills:
@@ -157,6 +197,57 @@ def register_skills(app: FastMCP) -> int:
     # --- Tool surface: make skills discoverable to the model itself ---
 
     @app.tool(
+        title="Find Relevant Odoo Skill",
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
+    async def find_skill(question: str) -> Dict[str, object]:
+        """Return the Odoo skill most relevant to a question, with its content.
+
+        Prefer this single tool over `list_skills` + `get_skill` — it
+        picks the right skill by keyword match and returns its full
+        markdown guide in one call. Use when you're about to execute a
+        domain workflow (selling, buying, inventory, etc.) and want the
+        reference material first.
+
+        Args:
+            question: The user's question or task description, any language.
+
+        Returns:
+            {name, description, content} of the best match, or an
+            empty dict if nothing matched. If multiple skills matched,
+            `alternatives` lists other candidate names.
+        """
+        scored: List[Tuple[int, str]] = []
+        for name, pattern in trigger_map:
+            score = len(pattern.findall(question))
+            if score > 0:
+                scored.append((score, name))
+        if not scored:
+            return {}
+        scored.sort(key=lambda s: (-s[0], s[1]))
+        top_name = scored[0][1]
+        top = next(s for s in skills if s["name"] == top_name)
+        path = Path(str(top["path"]))
+        try:
+            content = path.read_text(encoding="utf-8")
+        except OSError as e:
+            logger.warning(f"find_skill({top_name!r}) read failed: {e}")
+            content = ""
+        result: Dict[str, object] = {
+            "name": top_name,
+            "description": str(top["description"]),
+            "content": content,
+        }
+        if len(scored) > 1:
+            result["alternatives"] = [n for _, n in scored[1:4]]
+        return result
+
+    @app.tool(
         title="List Odoo Skills",
         annotations=ToolAnnotations(
             readOnlyHint=True,
@@ -166,11 +257,12 @@ def register_skills(app: FastMCP) -> int:
         ),
     )
     async def list_skills() -> List[Dict[str, str]]:
-        """List available Odoo workflow skills.
+        """Browse all Odoo workflow skills.
 
-        Each skill is a short guide on how to accomplish a domain task
-        in Odoo (selling, buying, inventory, importing, etc.). Use
-        `get_skill(name)` to read one before starting the workflow.
+        Fallback for when `find_skill` returned nothing or you want to
+        see the full catalogue. For "which skill should I use for X?"
+        prefer `find_skill(question=X)` — it picks and returns content
+        in one call.
 
         Returns:
             A list of {name, description} entries.
