@@ -11,8 +11,10 @@ management UI, admin dashboard, deploy infrastructure) live in the proprietary
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-04-28
+
 ### Added
-- `set_binary_field` tool: upload images and binaries to record fields by URL (e.g. `image_1920`, attachments). URL-only — `data:` URIs are rejected.
+- **`set_binary_field`** tool: upload images and binaries to record fields by URL (e.g. `image_1920`, attachments). URL-only — `data:` URIs are rejected.
 - Warning when writing `image_1920` on `product.product` falls through to the template.
 
 ## [1.4.3] - 2026-04-23
