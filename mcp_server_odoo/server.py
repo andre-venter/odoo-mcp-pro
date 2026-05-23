@@ -589,6 +589,9 @@ class OdooMCPServer:
         client_secret = os.getenv("ZITADEL_CLIENT_SECRET", "").strip()
 
         if not issuer_url:
+            # Portal mode: DATABASE_URL present but no Zitadel → API key auth
+            if os.getenv("DATABASE_URL", "").strip():
+                return OdooMCPServer._build_portal_auth_settings()
             return None, None
 
         # Validate that all required OAuth vars are present
@@ -643,6 +646,30 @@ class OdooMCPServer:
         )
 
         return auth_settings, token_verifier
+
+    @staticmethod
+    def _build_portal_auth_settings():
+        """Build auth settings for portal mode (API key auth, no Zitadel).
+
+        Activated when DATABASE_URL is set but OAUTH_ISSUER_URL is not.
+        Sets up Bearer token validation via PortalKeyVerifier without
+        registering OAuth discovery endpoints (resource_server_url=None).
+        """
+        from mcp.server.auth.settings import AuthSettings
+
+        from .portal_auth import PortalKeyVerifier
+
+        database_url = os.getenv("DATABASE_URL", "").strip()
+        admin_base_url = os.getenv("ADMIN_BASE_URL", "http://localhost:8080").strip()
+
+        auth_settings = AuthSettings(
+            issuer_url=admin_base_url,
+            resource_server_url=None,
+            required_scopes=[],
+        )
+        verifier = PortalKeyVerifier(database_url=database_url)
+        logger.info("Portal auth configured (API key validation against portal DB)")
+        return auth_settings, verifier
 
     def _ensure_connection(self):
         """Ensure connection to Odoo is established.
@@ -796,8 +823,9 @@ class OdooMCPServer:
             database_url = os.getenv("DATABASE_URL", "").strip()
 
             with perf_logger.track_operation("server_startup"):
-                if database_url:
-                    # Multi-tenant mode: requires odoo-mcp-pro-admin package
+                oauth_issuer = os.getenv("OAUTH_ISSUER_URL", "").strip()
+                if database_url and oauth_issuer:
+                    # Multi-tenant mode with Zitadel: requires odoo-mcp-pro-admin package
                     try:
                         from .admin.db import DatabaseManager
                     except ImportError as e:
@@ -820,6 +848,28 @@ class OdooMCPServer:
                     logger.info("Usage tracking enabled")
 
                     # Register tools/resources with registry (no single connection)
+                    self._register_resources_with_registry()
+                    self._register_tools_with_registry()
+                elif database_url:
+                    # Portal mode: odoo-mcp-portal DB, API key auth, no Zitadel
+                    try:
+                        from mcp_adapter.db_manager import PortalDatabaseManager
+                    except ImportError as e:
+                        raise ConfigurationError(
+                            "DATABASE_URL is set without OAUTH_ISSUER_URL (portal mode), "
+                            "but mcp_adapter is not installed. "
+                            "Run: pip install odoo-mcp-portal"
+                        ) from e
+                    from .registry import ConnectionRegistry
+
+                    encryption_key = os.getenv("ENCRYPTION_KEY", "").strip()
+                    if not encryption_key:
+                        raise ConfigurationError("ENCRYPTION_KEY is required for portal mode")
+
+                    logger.info("Starting in portal mode (DATABASE_URL without Zitadel)")
+                    self.db_manager = PortalDatabaseManager(database_url, encryption_key)
+                    await self.db_manager.connect()
+                    self.registry = ConnectionRegistry(self.db_manager)
                     self._register_resources_with_registry()
                     self._register_tools_with_registry()
                 else:
